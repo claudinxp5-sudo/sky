@@ -1,662 +1,230 @@
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
-local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
-local TouchEnabled = UserInputService.TouchEnabled
-local MouseEnabled = UserInputService.MouseEnabled
+local Camera = Workspace.CurrentCamera
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SkyNetMobile"
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local WalkSpeed = 16
+local JumpPower = 50
 
-local mainFrame do
-    mainFrame = Instance.new("Frame")
-    mainFrame.Size = TouchEnabled and UDim2.new(0, 320, 0, 480) or UDim2.new(0, 350, 0, 500)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    mainFrame.Visible = false
-    mainFrame.Parent = ScreenGui
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = mainFrame
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(100, 149, 237)
-    stroke.Thickness = TouchEnabled and 2 or 1
-    stroke.Parent = mainFrame
-end
-
-local dragBar do
-    dragBar = Instance.new("Frame")
-    dragBar.Size = UDim2.new(1, 0, 0, 40)
-    dragBar.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    dragBar.Parent = mainFrame
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = dragBar
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 1, 0)
-    title.Text = "SkyNet v4 Mobile"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = TouchEnabled and Enum.Font.GothamBold or Enum.Font.SourceSansBold
-    title.TextSize = TouchEnabled and 18 or 16
-    title.BackgroundTransparency = 1
-    title.Parent = dragBar
-
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0.5, -15)
-    closeBtn.AnchorPoint = Vector2.new(1, 0.5)
-    closeBtn.Text = "×"
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = TouchEnabled and Enum.Font.GothamBold or Enum.Font.SourceSansBold
-    closeBtn.TextSize = TouchEnabled and 18 or 16
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.Parent = dragBar
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 4)
-    closeCorner.Parent = closeBtn
-end
-
-local tabList = Instance.new("ScrollingFrame")
-tabList.Size = UDim2.new(TouchEnabled and 0.22 or 0.23, 0, 1, -40)
-tabList.Position = UDim2.new(0, 0, 0, 40)
-tabList.BackgroundTransparency = 1
-tabList.ScrollBarThickness = TouchEnabled and 6 or 5
-tabList.Parent = mainFrame
-
-local tabListLayout = Instance.new("UIListLayout")
-tabListLayout.Padding = UDim.new(0, TouchEnabled and 4 or 6)
-tabListLayout.Parent = tabList
-
-local tabContent = Instance.new("ScrollingFrame")
-tabContent.Size = UDim2.new(1, -(TouchEnabled and 72 or 80), 1, -40)
-tabList.Position = UDim2.new(0, 40, 0, 40)
-tabContent.Position = UDim2.new(0, TouchEnabled and 72 or 80, 0, 40)
-tabContent.BackgroundTransparency = 1
-tabContent.ScrollBarThickness = TouchEnabled and 6 or 5
-tabContent.Parent = mainFrame
-tabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-
-local tabContentLayout = Instance.new("UIListLayout")
-tabContentLayout.Padding = UDim.new(0, TouchEnabled and 4 or 8)
-tabContentLayout.Parent = tabContent
-
-local tabPadding = Instance.new("UIPadding")
-tabPadding.PaddingTop = UDim.new(0, TouchEnabled and 8 or 10)
-tabPadding.PaddingBottom = UDim.new(0, TouchEnabled and 8 or 10)
-tabPadding.PaddingLeft = UDim.new(0, TouchEnabled and 8 or 10)
-tabPadding.PaddingRight = UDim.new(0, TouchEnabled and 8 or 10)
-tabPadding.Parent = tabContent
-
-local states = {
-    walkSpeed = 16,
-    jumpPower = 50,
-    autoCollect = false,
-    autoFarm = false,
-    farmDistance = 30,
-    fullBright = false,
-    noclip = false,
-    aimAssist = false,
-    aimRadius = 300,
-    noFog = false,
-    doubleJump = false,
-    fly = false,
-    flySpeed = 100,
-    teleportDistance = 5,
-    glowPlayers = false,
-    highlightDistance = 500,
-    teleportUp = false
-}
-
-local connections = {}
-
-local function createCorner(parent, radius)
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, radius or TouchEnabled and 8 or 6)
-    corner.Parent = parent
-    return corner
-end
-
-local function createStroke(parent, color, thickness)
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = color or Color3.fromRGB(100, 149, 237)
-    stroke.Thickness = thickness or (TouchEnabled and 2 or 1)
-    stroke.Parent = parent
-    return stroke
-end
-
-local function playClickEffect(button)
-    local originalSize = button.Size
-    local clickEffect = button:Clone()
-    clickEffect.Name = "ClickEffect"
-    clickEffect.ZIndex = 10
-    clickEffect.Visible = true
-    clickEffect.Size = originalSize
-    clickEffect.Position = UDim2.new(0.5, 0, 0.5, 0)
-    clickEffect.AnchorPoint = Vector2.new(0.5, 0.5)
-    clickEffect.BackgroundTransparency = 0.7
-    clickEffect.TextTransparency = 0.7
-    clickEffect.Parent = button.Parent
-
-    if button:IsA("TextButton") then
-        button.TextTransparency = 0
-    end
-
-    TweenService:Create(clickEffect, TweenInfo.new(0.2), {
-        Size = originalSize * 1.3,
-        BackgroundTransparency = 1
-    }):Play()
-    TweenService:Create(clickEffect, TweenInfo.new(0.2), {
-        TextTransparency = 1
-    }):Play()
-
-    task.delay(0.2, function()
-        clickEffect:Destroy()
-    end)
-end
-
-local function getCharacter()
+local function GetChar()
     return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 end
 
-local function getHumanoid()
-    local char = getCharacter()
-    return char and char:FindFirstChildOfClass("Humanoid")
+local function GetHRP()
+    local char = GetChar()
+    return char:FindFirstChild("HumanoidRootPart")
 end
 
-local function getHRP()
-    local char = getCharacter()
-    return char and char:FindFirstChild("HumanoidRootPart")
+local function GetHum()
+    local char = GetChar()
+    return char:FindFirstChildOfClass("Humanoid")
 end
 
-local function setValue(name, value)
-    states[name] = value
-    if name == "walkSpeed" and getHumanoid() then
-        getHumanoid().WalkSpeed = value
-    elseif name == "jumpPower" and getHumanoid() then
-        getHumanoid().JumpPower = value
-    elseif name == "fullBright" then
-        Lighting.Brightness = value and 4 or 1.5
-    elseif name == "noclip" then
-        local parts = getCharacter():GetDescendants()
-        for _, v in ipairs(parts) do
-            if v:IsA("BasePart") then
-                v.CanCollide = not value
-            end
+local function UpdateValues()
+    local hum = GetHum()
+    if hum then
+        hum.WalkSpeed = WalkSpeed
+        hum.JumpPower = JumpPower
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    UpdateValues()
+end)
+
+-- Fly
+local flying = false
+local FLY = nil
+local gyro = nil
+local bodyVelocity = nil
+
+local function StartFly()
+    local root = GetHRP()
+    if not root then return end
+
+    flying = true
+    local gyro = Instance.new("BodyGyro", root)
+    gyro.MaxTorque = Vector3.new(500000, 500000, 500000)
+    gyro.P = 1000
+    gyro.D = 50
+
+    local bodyVelocity = Instance.new("BodyVelocity", root)
+    bodyVelocity.MaxForce = Vector3.new(500000, 5000, 500000)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+
+    RunService.Stepped:Connect(function()
+        if not flying then
+            gyro:Destroy()
+            bodyVelocity:Destroy()
+            return
         end
-    elseif name == "aimAssist" and value then
-        local connection
-        connection = RunService.RenderStepped:Connect(function()
-            if not states.aimAssist then
-                connection:Disconnect()
-                return
-            end
-            local mousePos = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
-            local closest, closestDist = nil, math.huge
-            for _, v in ipairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer and v.Character then
-                    local head = v.Character:FindFirstChild("Head")
-                    if head then
-                        local screenPos = Workspace.CurrentCamera:WorldToScreenPoint(head.Position)
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                        if dist < closestDist and dist < states.aimRadius then
-                            closest, closestDist = head, dist
+
+        local moveDirection = GetHum().MoveDirection
+        if moveDirection.Magnitude > 0 then
+            local camCF = Camera.CoordinateFrame
+            local vector = camCF.LookVector * moveDirection.Z + camCF.RightVector * moveDirection.X
+            vector = Vector3.new(vector.X, 0, vector.Z).Unit
+            bodyVelocity.Velocity = vector * 100
+        else
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        end
+    end)
+end
+
+local function StopFly()
+    flying = false
+end
+
+-- Noclip
+local noclip = false
+local function ToggleNoclip()
+    noclip = not noclip
+    local char = GetChar()
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not noclip
+        end
+    end
+end
+
+-- Invisibility
+local function ToggleInvisibility()
+    local char = GetChar()
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.LocalTransparencyModifier = part.LocalTransparencyModifier == 0 and 1 or 0
+        end
+    end
+end
+
+-- Aimbot
+local aimbot = false
+local function ToggleAimbot()
+    aimbot = not aimbot
+    while aimbot do
+        task.wait()
+        local target = nil
+        local minDist = math.huge
+        local center = Camera.ViewportSize / 2
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    local screenPos, onScreen = Camera:WorldToScreenPoint(head.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            target = head
                         end
                     end
                 end
             end
-            if closest then
-                local humRoot = getHRP()
-                if humRoot then
-                    humRoot.CFrame = CFrame.lookAt(humRoot.Position, closest.Position)
-                end
-            end
-        end)
-        connections.aimAssist = connection
-    elseif name == "glowPlayers" then
-        local glowFolder = Workspace:FindFirstChild("SkyNetGlow")
-        if value then
-            glowFolder = Instance.new("Folder")
-            glowFolder.Name = "SkyNetGlow"
-            glowFolder.Parent = Workspace
-            for _, v in ipairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer and v.Character then
-                    coroutine.wrap(function()
-                        local glow
-                        repeat
-                            task.wait(0.2)
-                            local head = v.Character:FindFirstChild("Head")
-                            if head then
-                                local distance = (head.Position - (getHRP() and getHRP().Position or Vector3.new())).Magnitude
-                                if distance < states.highlightDistance then
-                                    if not glow then
-                                        glow = Instance.new("BoxHandleAdornment")
-                                        glow.Adornee = head
-                                        glow.Size = Vector3.new(4, 5, 4)
-                                        glow.Color3 = Color3.new(1, 0.5, 0)
-                                        glow.AlwaysOnTop = true
-                                        glow.Transparency = 0.7
-                                        glow.ZIndex = 5
-                                        glow.Parent = glowFolder
-                                    end
-                                else
-                                    if glow then
-                                        glow:Destroy()
-                                        glow = nil
-                                    end
-                                end
-                            end
-                        until not glow or not states.glowPlayers
-                        if glow then glow:Destroy() end
-                    end)()
-                end
-            end
-        else
-            if glowFolder then
-                glowFolder:Destroy()
-            end
         end
-    elseif name == "fly" and value then
-        local root = getHRP()
-        if not root then return end
 
-        local bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
-        bodyGyro.D = 50
-        bodyGyro.P = 1000
-        bodyGyro.Parent = root
+        if target then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+        end
+    end
+end
 
-        local bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.MaxForce = Vector3.new(400000, 0, 400000)
-        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.Parent = root
+-- AutoFarm
+local autoFarm = false
+local farmDist = 20
+local function ToggleAutoFarm()
+    autoFarm = not autoFarm
+    if autoFarm then
+        local connection = nil
+        connection = RunService.Heartbeat:Connect(function()
+            local hrp = GetHRP()
+            if not hrp then return end
 
-        connections.flyGyro = bodyGyro
-        connections.flyVelocity = bodyVelocity
-
-        local flyConnection
-        flyConnection = RunService.Stepped:Connect(function()
-            if not states.fly or not root then
-                flyConnection:Disconnect()
-                if bodyGyro then bodyGyro:Destroy() end
-                if bodyVelocity then bodyVelocity:Destroy() end
-                return
+            local closestDist = farmDist
+            local closestTarget = nil
+            for _, part in ipairs(Workspace:GetDescendants()) do
+                if part.Name == "HumanoidRootPart" and part.Parent ~= GetChar() then
+                    local dist = (hrp.Position - part.Position).magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestTarget = part
+                    end
+                end
             end
 
-            local moveDirection = getHumanoid().MoveDirection
-            local cameraCF = Workspace.CurrentCamera.CFrame
-            local rightVector = cameraCF.RightVector
-            local forwardVector = cameraCF.LookVector * Vector3.new(1, 0, 1).Unit
-
-            local movement = (forwardVector * moveDirection.Z + rightVector * moveDirection.X)
-            if movement.Magnitude > 0 then
-                movement = movement.Unit * states.flySpeed
-                bodyVelocity.Velocity = Vector3.new(movement.X, moveDirection.Y * states.flySpeed, movement.Z)
+            if closestTarget then
+                local direction = (closestTarget.Position - hrp.Position).unit * Vector3.new(1,0,1)
+                GetHum():Move(direction)
+                if closestDist < 5 then
+                    local tool = GetChar():FindFirstChildOfClass("Tool")
+                    if tool then
+                        local remote = tool:FindFirstChildOfClass("RemoteEvent")
+                        if remote then
+                            remote:FireServer()
+                        end
+                    end
+                end
             else
-                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                GetHum():Move(Vector3.new(0,0,0))
             end
         end)
-        connections.flyConnection = flyConnection
-    elseif name == "fly" and not value then
-        if connections.flyGyro then
-            connections.flyGyro:Destroy()
-            connections.flyGyro = nil
-        end
-        if connections.flyVelocity then
-            connections.flyVelocity:Destroy()
-            connections.flyVelocity = nil
-        end
-        if connections.flyConnection then
-            connections.flyConnection:Disconnect()
-            connections.flyConnection = nil
-        end
-    elseif name == "teleportUp" and value then
-        local hrp = getHRP()
-        if hrp then
-            hrp.CFrame = hrp.CFrame + Vector3.new(0, states.teleportDistance, 0)
-        end
-        states.teleportUp = false
-    elseif name == "noFog" then
-        Lighting.FogEnd = value and 100000 or 800
-    end
-end
 
-local tabs = {}
-local function createTab(name)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, TouchEnabled and 40 or 35)
-    btn.Text = name
-    btn.Font = TouchEnabled and Enum.Font.GothamBold or Enum.Font.SourceSansBold
-    btn.TextSize = TouchEnabled and 16 or 13
-    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    btn.Parent = tabList
-    createCorner(btn, TouchEnabled and 8 or 4)
-    createStroke(btn)
-
-    local page = Instance.new("Frame")
-    page.Name = name.."Page"
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.Visible = false
-    page.Parent = tabContent
-
-    tabs[name] = page
-
-    btn.MouseButton1Click:Connect(function()
-        for _, v in pairs(tabs) do
-            v.Visible = false
-        end
-        page.Visible = true
-
-        for _, b in ipairs(tabList:GetChildren()) do
-            if b:IsA("TextButton") then
-                b.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-                b.TextColor3 = Color3.fromRGB(220, 220, 220)
+        coroutine.wrap(function()
+            while autoFarm and connection do
+                task.wait()
             end
-        end
-        btn.BackgroundColor3 = Color3.fromRGB(100, 149, 237)
-        btn.TextColor3 = Color3.new(1, 1, 1)
-    end)
-
-    return btn, page
-end
-
-local function createToggle(tab, text, desc, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, TouchEnabled and 65 or 60)
-    container.BackgroundTransparency = 1
-    container.Parent = tab
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, TouchEnabled and 50 or 45)
-    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    frame.Parent = container
-    createCorner(frame, TouchEnabled and 8 or 4)
-    createStroke(frame)
-
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0, TouchEnabled and 50 or 40, 0, TouchEnabled and 30 or 22)
-    toggle.Position = UDim2.new(1, TouchEnabled and -65 or -55, 0.5, 0)
-    toggle.AnchorPoint = Vector2.new(1, 0.5)
-    toggle.Text = ""
-    toggle.Parent = frame
-    createCorner(toggle, TouchEnabled and 15 or 11)
-    toggle.BackgroundColor3 = states[text] and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(70, 70, 70)
-
-    local button = Instance.new("Frame")
-    button.Size = UDim2.new(1, -12, 1, 0)
-    button.Position = UDim2.new(0, 6, 0.5, 0)
-    button.AnchorPoint = Vector2.new(0, 0.5)
-    button.BackgroundTransparency = 1
-    button.Parent = container
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, TouchEnabled and 20 or 15)
-    title.Position = UDim2.new(0, 5, 0, TouchEnabled and 8 or 5)
-    title.Text = text
-    title.Font = TouchEnabled and Enum.Font.GothamBold or Enum.Font.SourceSansBold
-    title.TextSize = TouchEnabled and 15 or 14
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.BackgroundTransparency = 1
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = button
-
-    local description = Instance.new("TextLabel")
-    description.Size = UDim2.new(1, 0, 0, TouchEnabled and 20 or 15)
-    description.Position = UDim2.new(0, 5, 1, TouchEnabled and -25 or -15)
-    description.Text = desc or ""
-    description.Font = TouchEnabled and Enum.Font.Gotham or Enum.Font.SourceSans
-    description.TextSize = TouchEnabled and 14 or 12
-    description.TextColor3 = Color3.fromRGB(180, 180, 180)
-    description.BackgroundTransparency = 1
-    description.TextXAlignment = Enum.TextXAlignment.Left
-    description.TextWrapped = true
-    description.Parent = button
-
-    toggle.MouseButton1Click:Connect(function()
-        states[text] = not states[text]
-        local color = states[text] and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(70, 70, 70)
-        toggle.BackgroundColor3 = color
-        callback(states[text])
-    end)
-
-    return toggle
-end
-
-local function createSlider(tab, text, min, max, default, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, TouchEnabled and 70 or 60)
-    container.BackgroundTransparency = 1
-    container.Parent = tab
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, TouchEnabled and 50 or 45)
-    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    frame.Parent = container
-    createCorner(frame, TouchEnabled and 8 or 4)
-    createStroke(frame)
-
-    local button = Instance.new("Frame")
-    button.Size = UDim2.new(1, -12, 1, 0)
-    button.Position = UDim2.new(0, 6, 0.5, 0)
-    button.AnchorPoint = Vector2.new(0, 0.5)
-    button.BackgroundTransparency = 1
-    button.Parent = container
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, TouchEnabled and 22 or 18)
-    title.Position = UDim2.new(0, 5, 0, TouchEnabled and 8 or 5)
-    title.Text = text
-    title.Font = TouchEnabled and Enum.Font.GothamBold or Enum.Font.SourceSansBold
-    title.TextSize = TouchEnabled and 15 or 14
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.BackgroundTransparency = 1
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = button
-
-    local valueText = title:Clone()
-    valueText.Size = UDim2.new(1, 0, 0, TouchEnabled and 22 or 18)
-    valueText.Position = UDim2.new(0.5, 0, 0, TouchEnabled and 8 or 5)
-    valueText.TextXAlignment = Enum.TextXAlignment.Center
-    valueText.Parent = button
-
-    local slider = Instance.new("Frame")
-    slider.Size = UDim2.new(0.8, 0, 0, TouchEnabled and 8 or 6)
-    slider.Position = UDim2.new(0, 5, 1, TouchEnabled and -25 or -15)
-    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    slider.Parent = frame
-    createCorner(slider, TouchEnabled and 4 or 3)
-
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new(0, ((default-min)/(max-min))*(TouchEnabled and 80*0.8 or 80*0.8), 0, TouchEnabled and 8 or 6)
-    fill.Position = UDim2.new(0, 0, 0, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(100, 149, 237)
-    fill.Parent = slider
-    createCorner(fill, TouchEnabled and 4 or 3)
-
-    local dragging = false
-    local function update(pos)
-        local rel = math.clamp((pos.X - slider.AbsolutePosition.X)/slider.AbsoluteSize.X, 0, 1)
-        local val = math.floor(min + (max-min)*rel)
-        fill.Size = UDim2.new(0, rel*slider.AbsoluteSize.X, 0, TouchEnabled and 8 or 6)
-        valueText.Text = tostring(val)
-        callback(val)
+            if connection then
+                connection:Disconnect()
+            end
+        end)()
     end
-
-    slider.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            update(input.Position)
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            update(input.Position)
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    return slider
 end
 
-local function createButton(tab, text, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, TouchEnabled and 50 or 40)
-    btn.Text = text
-    btn.Font = TouchEnabled and Enum.Font.GothamBold or Enum.Font.SourceSansBold
-    btn.TextSize = TouchEnabled and 16 or 14
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 120, 210)
-    btn.Parent = tab
-    createCorner(btn, TouchEnabled and 10 or 6)
-    createStroke(btn)
+-- ESP
+local espEnabled = false
+local function ToggleESP()
+    espEnabled = not espEnabled
+    local espFolder = Workspace:FindFirstChild("ESP")
+    if espFolder then espFolder:Destroy() end
 
-    btn.MouseButton1Down:Connect(function()
-        playClickEffect(btn)
-        Callback(function()
-            callback()
-        end)
-    end)
+    if espEnabled then
+        espFolder = Instance.new("Folder")
+        espFolder.Name = "ESP"
+        espFolder.Parent = Workspace
 
-    return btn
-end
+        local function updateESP()
+            for _, child in ipairs(espFolder:GetChildren()) do
+                child:Destroy()
+            end
 
-local movementTab, movementPage = createTab("Movement")
-local playerTab, playerPage = createTab("Player")
-local visualTab, visualPage = createTab("Visual")
-local combatTab, combatPage = createTab("Combat")
-local utilityTab, utilityPage = createTab("Utility")
+            local espFolder2 = Instance.new("Folder")
+            espFolder2.Parent = espFolder
 
-createToggle(movementPage, "WalkSpeed", "Ajusta velocidade do jogador", function(v)
-    setValue("walkSpeed", v and 100 or 16)
-end)
-createSlider(movementPage, "Custom WalkSpeed", 16, TouchEnabled and 300 or 400, 16, function(v)
-    setValue("walkSpeed", v)
-end)
-
-createToggle(movementPage, "JumpPower", "Ajusta altura do pulo", function(v)
-    setValue("jumpPower", v and 120 or 50)
-end)
-createSlider(movementPage, "Custom JumpPower", 50, TouchEnabled and 300 or 400, 50, function(v)
-    setValue("jumpPower", v)
-end)
-
-createToggle(movementPage, "Double Jump", "Ativa pulo duplo", function(v)
-    states.doubleJump = v
-    if v then
-        local humanoid = getHumanoid()
-        if humanoid then
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Falling, false)
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
-        end
-    end
-end)
-
-createToggle(movementPage, "Fly", "Ativa modo vôo", function(v)
-    setValue("fly", v)
-end)
-createSlider(movementPage, "Fly Speed", 50, TouchEnabled and 250 or 300, 100, function(v)
-    states.flySpeed = v
-end)
-
-createToggle(movementPage, "Teleport Up", "Teleporta para cima", function(v)
-    setValue("teleportUp", v)
-end)
-createSlider(movementPage, "Teleport Height", 5, 50, 5, function(v)
-    states.teleportDistance = v
-end)
-
-createToggle(combatTab, "Aim Assist", "Ajudante de mira", function(v)
-    setValue("aimAssist", v)
-end)
-createSlider(combatTab, "Aim Radius", 50, 1000, 300, function(v)
-    states.aimRadius = v
-end)
-
-createButton(combatTab, "TriggerBot", function()
-    if connections.triggerBot then
-        connections.triggerBot:Disconnect()
-        connections.triggerBot = nil
-        return
-    end
-    connections.triggerBot = RunService.RenderStepped:Connect(function()
-        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            local mousePos = UserInputService:GetMouseLocation()
-            local camera = Workspace.CurrentCamera
-            local params = RaycastParams.new()
-            params.FilterDescendantsInstances = {getCharacter()}
-            local ray = camera:ViewportPointToRay(mousePos.X, mousePos.Y)
-            local result = Workspace:Raycast(ray.Origin, ray.Direction*500, params)
-            if result and result.Instance:FindFirstAncestorOfClass("Model") then
-                local model = result.Instance:FindFirstAncestorOfClass("Model")
-                if model:FindFirstChild("HumanoidRootPart") then
-                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(mousePos.X, mousePos.Y, Enum.UserInputType.MouseButton1, false)
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local hl = Instance.new("BoxHandleAdornment")
+                    hl.Adornee = player.Character:FindFirstChild("HumanoidRootPart")
+                    hl.Size = Vector3.new(4, 6, 4)
+                    hl.Color3 = player.TeamColor.Color or Color3.new(1, 0, 0)
+                    hl.AlwaysOnTop = true
+                    hl.Transparency = 0.5
+                    hl.Parent = espFolder2
                 end
             end
         end
-    end)
-end)
 
-createToggle(playerPage, "God Mode", "Invisibilidade de danos",function()
-    states.noclip = not states.noclip
-    setValue("noclip", states.noclip)
-end)
-
-createToggle(playerPage, "NoClip", "Atravessa paredes",function()
-    states.noclip = not states.noclip
-    setValue("noclip", states.noclip)
-end)
-
-createToggle(visualPage, "FullBright", "Iluminação máxima", function(v)
-    setValue("fullBright", v)
-end)
-
-createToggle(visualPage, "No Fog", "Remove nevoa", function(v)
-    setValue("noFog", v)
-end)
-
-createToggle(visualPage, "Glow Players", "Destaca jogadores próximos", function(v)
-    setValue("glowPlayers", v)
-end)
-createSlider(visualPage, "Highlight Distance", 100, 1000, 500, function(v)
-    states.highlightDistance = v
-    if states.glowPlayers then
-        setValue("glowPlayers", true)
+        Players.PlayerAdded:Connect(updateESP)
+        Players.PlayerRemoving:Connect(updateESP)
+        task.spawn(function()
+            while espEnabled do
+                updateESP()
+                task.wait(0.5)
+            end
+        end)
     end
-end)
-
-local openButton = Instance.new("TextButton")
-openButton.Size = UDim2.new(TouchEnabled and 0.2 or 0.12, 0, TouchEnabled and 0.1 or 0.1, 0)
-openButton.Position = UDim2.new(TouchEnabled and 0.05 or 0.03, 0, TouchEnabled and 0.78 or 0.85, 0)
-openButton.Text = "MENU"
-openButton.Font = TouchEnabled and Enum.Font.GothamBold or Enum.Font.SourceSansBold
-openButton.TextSize = TouchEnabled and 20 or 14
-openButton.TextColor3 = Color3.new(1, 1)
-openButton.BackgroundColor3 = Color3.fromRGB(100, 149, 237)
-openButton.Parent = ScreenGui
-createCorner(openButton, TouchEnabled and 15 or 8)
-createStroke(openButton)
-
-closeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-end)
-
-openButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
-    if mainFrame.Visible then
-        states.walkSpeed = getHumanoid() and getHumanoid().WalkSpeed or 16
-        states.jumpPower = getHumanoid() and getHumanoid().JumpPower or 50
-    end
-end)
+end
